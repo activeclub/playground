@@ -18,7 +18,7 @@ importers:
         specifier: 0.21.0
         version: 0.21.0
       '@radix-ui/react-slot':
-        specifier: ^1.1.1
+        specifier: 1.1.1
         version: 1.1.1(@types/react@18.3.17)(react@18.3.1)
       '@remix-run/node':
         specifier: 2.15.1
@@ -27,16 +27,16 @@ importers:
         specifier: 2.15.1
         version: 2.15.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       class-variance-authority:
-        specifier: ^0.7.1
+        specifier: 0.7.1
         version: 0.7.1
       isbot:
         specifier: 4.4.0
         version: 4.4.0
       jotai:
-        specifier: ^2.10.4
+        specifier: 2.10.4
         version: 2.10.4(@types/react@18.3.17)(react@18.3.1)
       lucide-react:
-        specifier: ^0.468.0
+        specifier: 0.468.0
         version: 0.468.0(react@18.3.1)
       react:
         specifier: 18.3.1
@@ -45,10 +45,10 @@ importers:
         specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       react-syntax-highlighter:
-        specifier: ^15.6.1
+        specifier: 15.6.1
         version: 15.6.1(react@18.3.1)
       tailwindcss-animate:
-        specifier: ^1.0.7
+        specifier: 1.0.7
         version: 1.0.7(tailwindcss@3.4.17)
     devDependencies:
       '@remix-run/dev':
@@ -61,28 +61,28 @@ importers:
         specifier: 18.3.5
         version: 18.3.5(@types/react@18.3.17)
       '@types/react-syntax-highlighter':
-        specifier: ^15.5.13
+        specifier: 15.5.13
         version: 15.5.13
       autoprefixer:
-        specifier: ^10.4.20
+        specifier: 10.4.20
         version: 10.4.20(postcss@8.4.49)
       clsx:
-        specifier: ^2.1.1
+        specifier: 2.1.1
         version: 2.1.1
       postcss:
-        specifier: ^8.4.49
+        specifier: 8.4.49
         version: 8.4.49
       tailwind-merge:
-        specifier: ^2.5.5
+        specifier: 2.5.5
         version: 2.5.5
       tailwindcss:
-        specifier: ^3.4.17
+        specifier: 3.4.17
         version: 3.4.17
       vite:
         specifier: 5.4.11
         version: 5.4.11(@types/node@22.10.2)
       vite-tsconfig-paths:
-        specifier: ^5.1.4
+        specifier: 5.1.4
         version: 5.1.4(vite@5.4.11(@types/node@22.10.2))
 
 packages:
