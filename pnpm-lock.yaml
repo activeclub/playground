@@ -30,8 +30,8 @@ importers:
         specifier: 0.7.1
         version: 0.7.1
       isbot:
-        specifier: 4.4.0
-        version: 4.4.0
+        specifier: 5.1.19
+        version: 5.1.19
       jotai:
         specifier: 2.10.4
         version: 2.10.4(@types/react@18.3.18)(react@18.3.1)
@@ -1633,8 +1633,8 @@ packages:
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
 
-  isbot@4.4.0:
-    resolution: {integrity: sha512-8ZvOWUA68kyJO4hHJdWjyreq7TYNWTS9y15IzeqVdKxR9pPr3P/3r9AHcoIv9M0Rllkao5qWz2v1lmcyKIVCzQ==}
+  isbot@5.1.19:
+    resolution: {integrity: sha512-8krWJBGKC3lVymkncvmBTpIEWMD5kKmjAvkM3/Xh6veE0bAydwgSNrI5h493DGrG2UNJCy0HuHpNPSKRy0dBJA==}
     engines: {node: '>=18'}
 
   isexe@2.0.0:
@@ -4432,7 +4432,7 @@ snapshots:
 
   isarray@1.0.0: {}
 
-  isbot@4.4.0: {}
+  isbot@5.1.19: {}
 
   isexe@2.0.0: {}
 
