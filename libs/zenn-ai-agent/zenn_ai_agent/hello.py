@@ -1,6 +1,7 @@
 import pyttsx3
 import speech_recognition as sr
 from google import genai
+from google.cloud import texttospeech
 
 from zenn_ai_agent.config import config
 
@@ -15,8 +16,11 @@ r = sr.Recognizer()
 engine = pyttsx3.init()
 # for voice in engine.getProperty('voices'):
 #     print(voice)
-engine.setProperty('voice', 'com.apple.eloquence.ja-JP.Sandy')
+# engine.setProperty('voice', 'com.apple.eloquence.ja-JP.Sandy')
+engine.setProperty('voice', 'Japanese')
 # engine.setProperty('rate', 150)  # 読み上げ速度
+
+client = texttospeech.TextToSpeechClient()
 
 async def main():
     print("Hello from zenn-ai-agent!")
@@ -34,12 +38,35 @@ async def main():
 
 
 def speak(text: str):
-    engine.say(text)
-    engine.runAndWait()
+    # engine.say(text)
+    # engine.runAndWait()
+
+    input = texttospeech.SynthesisInput()
+    input.text = "text_value"
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="ja-JP",
+        ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+    )
+
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3
+    )
+
+    request = texttospeech.SynthesizeSpeechRequest(
+        input=input,
+        voice=voice,
+        audio_config=audio_config,
+    )
+
+    # Make the request
+    response = client.synthesize_speech(request=request)
+    print(response)
 
 def speech_test():
     with sr.Microphone() as source:
-        speak("こんにちは！ご用件はなんでしょうか？")
+        speak("こんにちは")
+        # speak("Say something!")
         print("Say something!")
         audio = r.listen(source)
 
@@ -51,8 +78,8 @@ def speech_test():
         text = r.recognize_google(audio)
         print("Google Speech Recognition thinks you said " + text)
         speak(text)
-    except sr.UnknownValueError:
-        print("Google Speech Recognition could not understand audio")
+    except sr.UnknownValueError as e:
+        print(f"Google Speech Recognition could not understand audio; {e}")
     except sr.RequestError as e:
         print(
             "Could not request results from Google Speech Recognition service; {0}".format(
