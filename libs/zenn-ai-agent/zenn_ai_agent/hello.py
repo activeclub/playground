@@ -1,93 +1,78 @@
-import pyttsx3
-import speech_recognition as sr
+import asyncio
+import re
+
 from google import genai
-from google.cloud import texttospeech
 
-from zenn_ai_agent.config import config
+from zenn_ai_agent.config import config as app_config
+from zenn_ai_agent.speach_to_text import GoogleSpeach, MicrophoneStream
+from zenn_ai_agent.text_to_speach import speak
 
-client = genai.Client(
-    api_key=config.gemini_api_key, http_options={"api_version": "v1alpha"}
-)
-model_id = "gemini-2.0-flash-exp"
-config = {"response_modalities": ["TEXT"]}
+# Audio recording parameters
+RATE = 16000
+CHUNK = int(RATE / 10)  # 100ms
 
-r = sr.Recognizer()
 
-engine = pyttsx3.init()
-# for voice in engine.getProperty('voices'):
-#     print(voice)
-# engine.setProperty('voice', 'com.apple.eloquence.ja-JP.Sandy')
-engine.setProperty('voice', 'Japanese')
-# engine.setProperty('rate', 150)  # 読み上げ速度
+async def listen_loop(responses: object, session: object) -> str:
+    num_chars_printed = 0
+    for response in responses:
+        if not response.results:
+            continue
 
-client = texttospeech.TextToSpeechClient()
+        # The `results` list is consecutive. For streaming, we only care about
+        # the first result being considered, since once it's `is_final`, it
+        # moves on to considering the next utterance.
+        result = response.results[0]
+        if not result.alternatives:
+            continue
 
-async def main():
-    print("Hello from zenn-ai-agent!")
-    async with client.aio.live.connect(model=model_id, config=config) as session:
-        while True:
-            message = input("User> ")
-            if message.lower() == "exit":
-                break
-            await session.send(message, end_of_turn=True)
+        # Display the transcription of the top alternative.
+        transcript = result.alternatives[0].transcript
 
-            async for response in session.receive():
-                if response.text is None:
+        # Display interim results, but with a carriage return at the end of the
+        # line, so subsequent lines will overwrite them.
+        #
+        # If the previous result was longer than this one, we need to print
+        # some extra spaces to overwrite the previous result
+        overwrite_chars = " " * (num_chars_printed - len(transcript))
+
+        if not result.is_final:
+            await session.send(transcript, end_of_turn=True)
+            async for res in session.receive():
+                if res.text is None:
                     continue
-                print(response.text, end="")
+                speak(res.text)
+
+            num_chars_printed = len(transcript)
+
+        else:
+            print(transcript + overwrite_chars)
+
+            # Exit recognition if any of the transcribed phrases could be
+            # one of our keywords.
+            if re.search(r"\b(exit|quit)\b", transcript, re.I):
+                print("Exiting..")
+                break
+
+            num_chars_printed = 0
+
+    return transcript
 
 
-def speak(text: str):
-    # engine.say(text)
-    # engine.runAndWait()
-
-    input = texttospeech.SynthesisInput()
-    input.text = "text_value"
-
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="ja-JP",
-        ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+async def main() -> None:
+    client = genai.Client(
+        api_key=app_config.gemini_api_key, http_options={"api_version": "v1alpha"}
     )
+    model_id = "gemini-2.0-flash-exp"
+    config = {"response_modalities": ["TEXT"]}
 
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3
-    )
+    speach = GoogleSpeach()
 
-    request = texttospeech.SynthesizeSpeechRequest(
-        input=input,
-        voice=voice,
-        audio_config=audio_config,
-    )
-
-    # Make the request
-    response = client.synthesize_speech(request=request)
-    print(response)
-
-def speech_test():
-    with sr.Microphone() as source:
-        speak("こんにちは")
-        # speak("Say something!")
-        print("Say something!")
-        audio = r.listen(source)
-
-    # recognize speech using Google Speech Recognition
-    try:
-        # for testing purposes, we're just using the default API key
-        # to use another API key, use `r.recognize_google(audio, key="GOOGLE_SPEECH_RECOGNITION_API_KEY")`
-        # instead of `r.recognize_google(audio)`
-        text = r.recognize_google(audio)
-        print("Google Speech Recognition thinks you said " + text)
-        speak(text)
-    except sr.UnknownValueError as e:
-        print(f"Google Speech Recognition could not understand audio; {e}")
-    except sr.RequestError as e:
-        print(
-            "Could not request results from Google Speech Recognition service; {0}".format(
-                e
-            )
-        )
+    async with client.aio.live.connect(model=model_id, config=config) as session:
+        with MicrophoneStream(RATE, CHUNK) as stream:
+            audio_generator = stream.generator()
+            responses = speach.recognize(audio_generator)
+            await listen_loop(responses, session)
 
 
 if __name__ == "__main__":
-    # asyncio.run(main())
-    speech_test()
+    asyncio.run(main())
