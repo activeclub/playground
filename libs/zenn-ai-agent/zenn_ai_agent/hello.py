@@ -4,8 +4,8 @@ import re
 from google import genai
 
 from zenn_ai_agent.config import config as app_config
+from zenn_ai_agent.speach import speak
 from zenn_ai_agent.speach_to_text import GoogleSpeach, MicrophoneStream
-from zenn_ai_agent.text_to_speach import speak
 
 # Audio recording parameters
 RATE = 16000
@@ -63,7 +63,7 @@ async def main() -> None:
         api_key=app_config.gemini_api_key, http_options={"api_version": "v1alpha"}
     )
     model_id = "gemini-2.0-flash-exp"
-    config = {"response_modalities": ["TEXT"]}
+    config = {"response_modalities": ["AUDIO"]}
 
     speach = GoogleSpeach()
 
