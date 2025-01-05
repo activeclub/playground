@@ -4,6 +4,7 @@ import io
 import traceback
 
 import cv2
+import numpy as np
 import PIL.Image
 import pyaudio
 from google import genai
@@ -84,6 +85,10 @@ class AudioLoop:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
             await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            if np.abs(audio_data).mean() > 500:
+                await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+
     def _get_frame(self, cap):
         # Read the frameq
         ret, frame = cap.read()
@@ -161,14 +166,15 @@ class AudioLoop:
                 self.audio_in_queue = asyncio.Queue()
                 self.out_queue = asyncio.Queue(maxsize=5)
 
-                tg.create_task(self.send_text())
-                tg.create_task(self.send_realtime())
+                send_text_task = tg.create_task(self.send_text())
                 tg.create_task(self.get_frames())
+                tg.create_task(self.listen_audio())
+                tg.create_task(self.send_realtime())
 
                 tg.create_task(self.receive_audio())
                 tg.create_task(self.play_audio())
 
-                await asyncio.sleep(100)
+                await send_text_task
                 raise asyncio.CancelledError("User requested exit")
         except asyncio.CancelledError:
             pass
@@ -182,7 +188,10 @@ async def main():
         api_key=app_config.gemini_api_key, http_options={"api_version": "v1alpha"}
     )
     model_id = "gemini-2.0-flash-exp"
-    config = {"response_modalities": ["AUDIO"]}
+    config = {
+        "response_modalities": ["AUDIO"],
+        "system_instruction": {"parts": [{"text": "Please answer in Japanese."}]},
+    }
 
     async with client.aio.live.connect(model=model_id, config=config) as session:
         await AudioLoop(session).run()
