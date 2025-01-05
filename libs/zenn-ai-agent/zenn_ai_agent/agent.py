@@ -161,14 +161,14 @@ class AudioLoop:
                 self.audio_in_queue = asyncio.Queue()
                 self.out_queue = asyncio.Queue(maxsize=5)
 
-                send_text_task = tg.create_task(self.send_text())
+                tg.create_task(self.send_text())
                 tg.create_task(self.send_realtime())
                 tg.create_task(self.get_frames())
 
                 tg.create_task(self.receive_audio())
                 tg.create_task(self.play_audio())
 
-                await send_text_task
+                await asyncio.sleep(100)
                 raise asyncio.CancelledError("User requested exit")
         except asyncio.CancelledError:
             pass
@@ -185,9 +185,9 @@ async def main():
     config = {"response_modalities": ["AUDIO"]}
 
     async with client.aio.live.connect(model=model_id, config=config) as session:
-        while True:
-            await AudioLoop(session).run()
-            # await text2audio(session)
+        await AudioLoop(session).run()
+        # while True:
+        #     await text2audio(session)
 
 
 if __name__ == "__main__":
