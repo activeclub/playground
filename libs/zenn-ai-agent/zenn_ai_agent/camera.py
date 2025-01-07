@@ -2,8 +2,6 @@ import time
 from datetime import datetime
 
 import cv2
-from picamera2 import Picamera2
-from picamera2.encoders import H264Encoder
 
 # /dev/video0を指定
 DEV_ID = 0
@@ -47,6 +45,9 @@ def cv2_sample():
 
 
 def pycamera_sample():
+    from picamera2 import Picamera2
+    from picamera2.encoders import H264Encoder
+
     picam2 = Picamera2()
     video_config = picam2.create_video_configuration()
     picam2.configure(video_config)
