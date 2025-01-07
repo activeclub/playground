@@ -19,6 +19,10 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
 
     # キャプチャの実施
+    if not cap.isOpened():
+        print(f"Error: Could not open video device {DEV_ID}. Please check if the camera is connected and accessible.")
+        return
+
     ret, frame = cap.read()
     if ret:
         # ファイル名に日付を指定
