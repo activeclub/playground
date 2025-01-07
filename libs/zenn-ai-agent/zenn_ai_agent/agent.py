@@ -127,7 +127,7 @@ class AudioLoop:
             if frame is None:
                 break
 
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(2.0)
 
             await self.out_queue.put(frame)
 

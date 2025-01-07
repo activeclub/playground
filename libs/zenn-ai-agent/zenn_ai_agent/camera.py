@@ -12,6 +12,7 @@ HEIGHT = 480
 def main():
     # /dev/video0を指定
     cap = cv2.VideoCapture(DEV_ID)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
 
     # 解像度の指定
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
