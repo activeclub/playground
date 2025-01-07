@@ -4,7 +4,6 @@ import io
 import traceback
 
 import cv2
-import numpy as np
 import PIL.Image
 import pyaudio
 from google import genai
@@ -83,11 +82,13 @@ class AudioLoop:
 
         while True:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
+            await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
-            audio_data = np.frombuffer(data, dtype=np.int16)
-            mean_abs_amplitude = np.abs(audio_data).mean()
-            if mean_abs_amplitude > 500:
-                await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+            # FIXME: For some reason, the response stops coming back.
+            # audio_data = np.frombuffer(data, dtype=np.int16)
+            # mean_abs_amplitude = np.abs(audio_data).mean()
+            # if mean_abs_amplitude > 500:
+            #     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
     def _get_frame(self, cap):
         # Read the frameq
@@ -117,6 +118,9 @@ class AudioLoop:
             cv2.VideoCapture,
             0,  # 0 represents the default camera
         )
+        # Prevent `tryIoctl VIDEOIO(V4L2:/dev/video0): select() timeout.` error
+        # ref: https://stackoverflow.com/questions/69575185/raspberry-pi-3-video-error-select-timeout-ubuntu
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
 
         while True:
             frame = await asyncio.to_thread(self._get_frame, cap)
