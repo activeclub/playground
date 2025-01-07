@@ -8,7 +8,7 @@ dependencies = [
     "google-cloud-speech>=2.29.0",
     "google-cloud-texttospeech>=2.23.0",
     "google-genai>=0.3.0",
-    "numpy>=2.2.1",
+    "numpy==1.26.4",
     "opencv-python>=4.10.0.84",
     "pillow>=11.0.0",
     "pyaudio>=0.2.14",
