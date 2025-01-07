@@ -83,10 +83,10 @@ class AudioLoop:
 
         while True:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
-            await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
             audio_data = np.frombuffer(data, dtype=np.int16)
-            if np.abs(audio_data).mean() > 500:
+            mean_abs_amplitude = np.abs(audio_data).mean()
+            if mean_abs_amplitude > 500:
                 await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
     def _get_frame(self, cap):
@@ -191,6 +191,11 @@ async def main():
     config = {
         "response_modalities": ["AUDIO"],
         "system_instruction": {"parts": [{"text": "Please answer in Japanese."}]},
+        "voice_config": {
+            "prebuilt_voice_config": {
+                "voice_name": "Puck",
+            }
+        },
     }
 
     async with client.aio.live.connect(model=model_id, config=config) as session:
