@@ -157,9 +157,9 @@ class AudioLoop:
                 # 画像が3チャンネル以外の場合は3チャンネルに変換する
                 channels = 1 if len(frame.shape) == 2 else frame.shape[2]
                 if channels == 1:
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
                 if channels == 4:
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 frame_data = await asyncio.to_thread(self._get_frame, frame_rgb)
             else:
                 ret, frame = cap.read()
