@@ -86,6 +86,7 @@ class AudioLoop:
             print("=== metadata ===")
             print(metadata)
         except ModuleNotFoundError:
+            print("libcamera or picamera2 is not installed.")
             self.picam2 = None
 
     async def send_text(self):
@@ -93,12 +94,12 @@ class AudioLoop:
             text = await asyncio.to_thread(input, "User> ")
             if text.lower() == "q":
                 break
-            await self.session.send(text or ".", end_of_turn=True)
+            await self.session.send(input=text or ".", end_of_turn=True)
 
     async def send_realtime(self):
         while True:
             msg = await self.out_queue.get()
-            await self.session.send(msg)
+            await self.session.send(input=msg)
 
     async def listen_audio(self):
         mic_info = self.audio_interface.get_default_input_device_info()
