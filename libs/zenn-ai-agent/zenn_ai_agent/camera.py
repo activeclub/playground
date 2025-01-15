@@ -59,6 +59,7 @@ def pycamera_sample():
     # picam2.stop_recording()
 
     sensor_modes = picam2.sensor_modes
+    print("=== sensor_modes ===")
     print(sensor_modes)
     full_resolution_mode = sensor_modes[1]
 
@@ -98,7 +99,14 @@ def pycamera_sample():
         # },
         raw=full_resolution_mode,
     )
+    print("=== preview_config ===")
     print(preview_config)
+    still_config = picam2.create_still_configuration(
+        main={"size": picam2.sensor_resolution},
+        buffer_count=1,
+        controls=camera_controls,
+    )
+
     picam2.configure(preview_config)
 
     # config = picam2.camera_configuration()
@@ -107,65 +115,40 @@ def pycamera_sample():
     picam2.set_controls({"ScalerCrop": full_resolution_mode["crop_limits"]})
 
     metadata = picam2.capture_metadata()
+    print("=== metadata ===")
     print(metadata)
 
-    time.sleep(2)
-    picam2.capture_file("test.jpg")
-    picam2.stop()
-    return
+    time.sleep(3.0)
 
-    still_config = picam2.create_still_configuration(
-        main={"size": picam2.sensor_resolution},
-        buffer_count=1,
-        controls=camera_controls,
-    )
-    print(still_config)
+    ##
+    # picam2.capture_file("test.jpg")
+    ##
 
-    return
+    ##
+    # while True:
+    #     im = picam2.capture_array()
+    #     cv2.imshow("Camera", im)
 
-    picam2.start()
+    #     key = cv2.waitKey(1)
+    #     # Escキーを入力されたら画面を閉じる
+    #     if key == 27:
+    #         break
+    # cv2.destroyAllWindows()
+    ##
 
-    # Continuousに変更
-    # オートフォーカスが自動的に継続的に行われる
-    # picam2.set_controls(
-    #     {
-    #         "AfMode": controls.AfModeEnum.Continuous,
-    #     }
-    # )
-    while True:
-        im = picam2.capture_array()
-        cv2.imshow("Camera", im)
-
-        key = cv2.waitKey(1)
-        # Escキーを入力されたら画面を閉じる
-        if key == 27:
-            break
-
-    picam2.stop()
-    cv2.destroyAllWindows()
-    return
-
-    time.sleep(2.0)
-
-    metadata = picam2.capture_file("test.jpg")
-    print(metadata)
-    picam2.close()
-    return
-
-    # カメラから画像を取得
+    ##
     frame = picam2.capture_array()
-    print(frame.shape)
-
     # 画像が3チャンネル以外の場合は3チャンネルに変換する
     channels = 1 if len(frame.shape) == 2 else frame.shape[2]
     if channels == 1:
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
     if channels == 4:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-
     # jpgに保存
-    cv2.imwrite("test.jpg", frame)
-    picam2.close()
+    cv2.imwrite("test_cv2.jpg", frame)
+    ##
+
+    picam2.stop()
 
 
 if __name__ == "__main__":

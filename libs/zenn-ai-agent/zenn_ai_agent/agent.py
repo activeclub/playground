@@ -50,6 +50,43 @@ class AudioLoop:
         self.out_queue = None
 
         self.audio_interface = pyaudio.PyAudio()
+        self.audio_stream = None
+
+        try:
+            from libcamera import controls
+            from picamera2 import Picamera2
+
+            self.picam2 = Picamera2()
+            sensor_modes = self.picam2.sensor_modes
+            print("=== sensor_modes ===")
+            print(sensor_modes)
+            mode = sensor_modes[0]
+
+            camera_controls = {
+                "AfMode": controls.AfModeEnum.Continuous,
+            }
+            preview_config = self.picam2.create_preview_configuration(
+                main={
+                    "format": "XRGB8888",
+                    "size": (1920, 1080),
+                },
+                # buffer_count=4,
+                controls=camera_controls,
+                raw=mode,
+            )
+            self.picam2.configure(preview_config)
+            config = self.picam2.camera_configuration()
+            print("=== camera config ===")
+            print(config)
+
+            self.picam2.start(config=preview_config)
+            self.picam2.set_controls({"ScalerCrop": mode["crop_limits"]})
+
+            metadata = self.picam2.capture_metadata()
+            print("=== metadata ===")
+            print(metadata)
+        except ModuleNotFoundError:
+            self.picam2 = None
 
     async def send_text(self):
         while True:
@@ -90,16 +127,7 @@ class AudioLoop:
             # if mean_abs_amplitude > 500:
             #     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
-    def _get_frame(self, cap):
-        # Read the frameq
-        ret, frame = cap.read()
-        # Check if the frame was read successfully
-        if not ret:
-            return None
-        # Fix: Convert BGR to RGB color space
-        # OpenCV captures in BGR but PIL expects RGB format
-        # This prevents the blue tint in the video feed
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def _get_frame(self, frame_rgb):
         img = PIL.Image.fromarray(frame_rgb)  # Now using RGB frame
         img.thumbnail([1024, 1024])
 
@@ -112,24 +140,40 @@ class AudioLoop:
         return {"mime_type": mime_type, "data": base64.b64encode(image_bytes).decode()}
 
     async def get_frames(self):
-        # This takes about a second, and will block the whole program
-        # causing the audio pipeline to overflow if you don't to_thread it.
-        cap = await asyncio.to_thread(
-            cv2.VideoCapture,
-            0,  # 0 represents the default camera
-        )
-        # Prevent `tryIoctl VIDEOIO(V4L2:/dev/video0): select() timeout.` error
-        # ref: https://stackoverflow.com/questions/69575185/raspberry-pi-3-video-error-select-timeout-ubuntu
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
+        if not self.picam2:
+            # This takes about a second, and will block the whole program
+            # causing the audio pipeline to overflow if you don't to_thread it.
+            cap = await asyncio.to_thread(
+                cv2.VideoCapture,
+                0,  # 0 represents the default camera
+            )
+            # Prevent `tryIoctl VIDEOIO(V4L2:/dev/video0): select() timeout.` error
+            # ref: https://stackoverflow.com/questions/69575185/raspberry-pi-3-video-error-select-timeout-ubuntu
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
 
         while True:
-            frame = await asyncio.to_thread(self._get_frame, cap)
-            if frame is None:
-                break
+            if self.picam2:
+                frame = self.picam2.capture_array()
+                # 画像が3チャンネル以外の場合は3チャンネルに変換する
+                channels = 1 if len(frame.shape) == 2 else frame.shape[2]
+                if channels == 1:
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                if channels == 4:
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                frame_data = await asyncio.to_thread(self._get_frame, frame_rgb)
+            else:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                # Fix: Convert BGR to RGB color space
+                # OpenCV captures in BGR but PIL expects RGB format
+                # This prevents the blue tint in the video feed
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_data = await asyncio.to_thread(self._get_frame, frame_rgb)
 
             await asyncio.sleep(2.0)
 
-            await self.out_queue.put(frame)
+            await self.out_queue.put(frame_data)
 
         # Release the VideoCapture object
         cap.release()
@@ -184,6 +228,8 @@ class AudioLoop:
             pass
         except ExceptionGroup as EG:
             self.audio_stream.close()
+            if self.picam2:
+                self.picam2.stop()
             traceback.print_exception(EG)
 
 
