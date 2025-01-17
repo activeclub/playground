@@ -1,7 +1,7 @@
 {
   "name": "playground",
   "version": "0.0.1",
-  "packageManager": "pnpm@9.15.1",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "format-and-lint": "biome check .",
     "format-and-lint:fix": "biome check . --write"
