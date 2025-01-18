@@ -4,9 +4,13 @@ import io
 import traceback
 
 import cv2
+import numpy as np
 import PIL.Image
 import pyaudio
 from google import genai
+from google.cloud import speech
+from prisma import Prisma
+from prisma.models import Message
 
 from zenn_ai_agent.config import config as app_config
 from zenn_ai_agent.speach import speak_from_bytes
@@ -48,9 +52,12 @@ class AudioLoop:
 
         self.audio_in_queue = None
         self.out_queue = None
+        self.db_queue = None
 
         self.audio_interface = pyaudio.PyAudio()
         self.audio_stream = None
+
+        self.speach = speech.SpeechClient()
 
         try:
             from libcamera import controls
@@ -101,6 +108,28 @@ class AudioLoop:
             msg = await self.out_queue.get()
             await self.session.send(input=msg)
 
+    async def save_db(self):
+        language_code = "ja-JP"  # a BCP-47 language tag
+        speach_config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=SEND_SAMPLE_RATE,
+            language_code=language_code,
+        )
+        while True:
+            data = await self.db_queue.get()
+            response = self.speach.recognize(speach_config, data["audio"])
+            transcript = ""
+            for result in response.results:
+                transcript += result.alternatives[0].transcript
+            transcript = data.get("transcript")
+            await Message.prisma().create(
+                {
+                    "contentAudio": data["data"],
+                    "contentTranscript": transcript,
+                    "speaker": data["speaker"],
+                }
+            )
+
     async def listen_audio(self):
         mic_info = self.audio_interface.get_default_input_device_info()
         self.audio_stream = await asyncio.to_thread(
@@ -120,13 +149,15 @@ class AudioLoop:
 
         while True:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
-            await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+
+            # await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
             # FIXME: For some reason, the response stops coming back.
-            # audio_data = np.frombuffer(data, dtype=np.int16)
-            # mean_abs_amplitude = np.abs(audio_data).mean()
-            # if mean_abs_amplitude > 500:
-            #     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            mean_abs_amplitude = np.abs(audio_data).mean()
+            if mean_abs_amplitude > 500:
+                await self.db_queue.put({"audio": data, "speaker": "USER"})
+                await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
     def _get_frame(self, frame_rgb):
         img = PIL.Image.fromarray(frame_rgb)  # Now using RGB frame
@@ -186,6 +217,7 @@ class AudioLoop:
             async for response in turn:
                 if data := response.data:
                     self.audio_in_queue.put_nowait(data)
+                    self.db_queue.put_nowait({"data": data, "speaker": "SYSTEM"})
                     continue
                 if text := response.text:
                     print(text, end="")
@@ -214,9 +246,10 @@ class AudioLoop:
             async with asyncio.TaskGroup() as tg:
                 self.audio_in_queue = asyncio.Queue()
                 self.out_queue = asyncio.Queue(maxsize=5)
+                self.db_queue = asyncio.Queue()
 
                 send_text_task = tg.create_task(self.send_text())
-                tg.create_task(self.get_frames())
+                # tg.create_task(self.get_frames())
                 tg.create_task(self.listen_audio())
                 tg.create_task(self.send_realtime())
 
@@ -249,10 +282,18 @@ async def main():
         },
     }
 
-    async with client.aio.live.connect(model=model_id, config=config) as session:
-        await AudioLoop(session).run()
-        # while True:
-        #     await text2audio(session)
+    prisma = Prisma(auto_register=True)
+
+    try:
+        await prisma.connect()
+        async with client.aio.live.connect(model=model_id, config=config) as session:
+            await AudioLoop(session).run()
+            # while True:
+            #     await text2audio(session)
+    except Exception as e:
+        print(e)
+    finally:
+        await prisma.disconnect()
 
 
 if __name__ == "__main__":

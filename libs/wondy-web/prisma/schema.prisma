@@ -1,0 +1,24 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+model Message {
+  id                String      @id @default(cuid())
+  contentAudio      Bytes       @map("message_audio")
+  contentTranscript String?     @map("message_transcript")
+  sentAt            DateTime    @default(now()) @map("posted_at")
+  speaker           SpeakerType @map("speaker")
+
+  @@map("messages")
+}
+
+enum SpeakerType {
+  USER
+  SYSTEM
+}
