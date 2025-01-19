@@ -11,7 +11,7 @@ dependencies = [
     "numpy==1.26.4",
     "opencv-python-headless==4.10.0.84",
     "pillow==11.1.0",
-    "prisma>=0.15.0",
+    "prisma==0.15.0",
     "pyaudio==0.2.14",
     "pydantic-settings==2.7.1",
     "pyttsx3==2.98",
