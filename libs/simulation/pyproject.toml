@@ -8,7 +8,7 @@ dependencies = [
   "gymnasium[mujoco,classic-control,other]==0.29.1",
   "mujoco==3.2.7",
   "torch==2.5.1",
-  "numpy==2.2.1",
+  "numpy==2.2.2",
   "polars==1.18.0",
   "pyarrow==17.0.0",
   "altair==5.5.0",
