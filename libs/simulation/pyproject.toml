@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "gymnasium[mujoco,classic-control,other]==0.29.1",
-  "mujoco==3.2.6",
+  "mujoco==3.2.7",
   "torch==2.5.1",
   "numpy==2.2.1",
   "polars==1.18.0",
