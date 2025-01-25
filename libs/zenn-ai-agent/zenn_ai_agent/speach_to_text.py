@@ -4,6 +4,8 @@ import sys
 
 import pyaudio
 from google.cloud import speech
+from google.cloud.speech_v2 import SpeechClient
+from google.cloud.speech_v2.types import cloud_speech
 
 # Audio recording parameters
 RATE = 16000
@@ -208,5 +210,39 @@ def main() -> None:
         listen_print_loop(responses)
 
 
+async def main2() -> None:
+    from google.oauth2 import service_account
+    from prisma import Base64, Prisma
+
+    speach_client = SpeechClient(
+        credentials=service_account.Credentials.from_service_account_file(
+            "/Users/nszknao/Downloads/service_account_key.json"
+        )
+    )
+    speach_config = cloud_speech.RecognitionConfig(
+        auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
+        # encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        # sample_rate_hertz=16000,
+        language_codes=["ja-JP"],
+        model="latest_long",
+    )
+
+    db = Prisma()
+    await db.connect()
+    message = await db.message.find_first(where={"id": "cm66ch1ej0002q5nx6h9u8nez"})
+    # audio = speech.RecognitionAudio(content=Base64.decode(message.contentAudio))
+    request = cloud_speech.RecognizeRequest(
+        recognizer="projects/swift-handler-446606-q0/locations/global/recognizers/_",
+        config=speach_config,
+        content=Base64.decode(message.contentAudio),
+    )
+    ret = speach_client.recognize(request=request)
+    print(ret)
+    await db.disconnect()
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    import asyncio
+
+    asyncio.run(main2())

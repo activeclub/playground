@@ -9,7 +9,9 @@ import PIL.Image
 import pyaudio
 from google import genai
 from google.cloud import speech
+from google.oauth2 import service_account
 from prisma import Prisma
+from prisma.fields import Base64
 from prisma.models import Message
 
 from zenn_ai_agent.config import config as app_config
@@ -57,7 +59,11 @@ class AudioLoop:
         self.audio_interface = pyaudio.PyAudio()
         self.audio_stream = None
 
-        self.speach = speech.SpeechClient()
+        self.speach = speech.SpeechClient(
+            credentials=service_account.Credentials.from_service_account_file(
+                "/Users/nszknao/Downloads/service_account_key.json"
+            )
+        )
 
         try:
             from libcamera import controls
@@ -117,14 +123,14 @@ class AudioLoop:
         )
         while True:
             data = await self.db_queue.get()
-            response = self.speach.recognize(speach_config, data["audio"])
+            audio = speech.RecognitionAudio(content=data["audio"])
+            response = self.speach.recognize(config=speach_config, audio=audio)
             transcript = ""
             for result in response.results:
                 transcript += result.alternatives[0].transcript
-            transcript = data.get("transcript")
             await Message.prisma().create(
                 {
-                    "contentAudio": data["data"],
+                    "contentAudio": Base64.encode(data["audio"]),
                     "contentTranscript": transcript,
                     "speaker": data["speaker"],
                 }
@@ -252,6 +258,7 @@ class AudioLoop:
                 # tg.create_task(self.get_frames())
                 tg.create_task(self.listen_audio())
                 tg.create_task(self.send_realtime())
+                tg.create_task(self.save_db())
 
                 tg.create_task(self.receive_audio())
                 tg.create_task(self.play_audio())
