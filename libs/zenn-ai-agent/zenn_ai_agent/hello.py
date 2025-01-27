@@ -4,8 +4,8 @@ import re
 from google import genai
 
 from zenn_ai_agent.config import config as app_config
-from zenn_ai_agent.speach import speak
-from zenn_ai_agent.speach_to_text import GoogleSpeach, MicrophoneStream
+from zenn_ai_agent.speech import speak
+from zenn_ai_agent.speech_to_text import GoogleSpeech, MicrophoneStream
 
 # Audio recording parameters
 RATE = 16000
@@ -65,12 +65,12 @@ async def main() -> None:
     model_id = "gemini-2.0-flash-exp"
     config = {"response_modalities": ["AUDIO"]}
 
-    speach = GoogleSpeach()
+    speech = GoogleSpeech()
 
     async with client.aio.live.connect(model=model_id, config=config) as session:
         with MicrophoneStream(RATE, CHUNK) as stream:
             audio_generator = stream.generator()
-            responses = speach.recognize(audio_generator)
+            responses = speech.recognize(audio_generator)
             await listen_loop(responses, session)
 
 

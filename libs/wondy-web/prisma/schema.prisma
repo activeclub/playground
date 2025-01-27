@@ -9,9 +9,9 @@ generator client {
 }
 
 model Message {
-  id                String      @id @default(cuid())
-  contentAudio      Bytes       @map("message_audio")
-  contentTranscript String?     @map("message_transcript")
+  id                String      @id @default(uuid())
+  contentURL        String      @map("content_url")
+  contentTranscript String?     @map("content_transcript")
   sentAt            DateTime    @default(now()) @map("posted_at")
   speaker           SpeakerType @map("speaker")
 

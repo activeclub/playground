@@ -1,11 +1,15 @@
+import io
 import queue
 import re
 import sys
+import wave
 
 import pyaudio
 from google.cloud import speech
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech
+
+from zenn_ai_agent.config import config
 
 # Audio recording parameters
 RATE = 16000
@@ -174,7 +178,7 @@ def listen_print_loop(responses: object) -> str:
     return transcript
 
 
-class GoogleSpeach:
+class GoogleSpeech:
     def __init__(self):
         # See http://g.co/cloud/speech/docs/languages
         # for a list of supported languages.
@@ -202,11 +206,11 @@ class GoogleSpeach:
 
 def main() -> None:
     """Transcribe speech from audio file."""
-    google_speach = GoogleSpeach()
+    google_speech = GoogleSpeech()
 
     with MicrophoneStream(RATE, CHUNK) as stream:
         audio_generator = stream.generator()
-        responses = google_speach.recognize(audio_generator)
+        responses = google_speech.recognize(audio_generator)
         listen_print_loop(responses)
 
 
@@ -214,12 +218,12 @@ async def main2() -> None:
     from google.oauth2 import service_account
     from prisma import Base64, Prisma
 
-    speach_client = SpeechClient(
+    speech_client = SpeechClient(
         credentials=service_account.Credentials.from_service_account_file(
-            "/Users/nszknao/Downloads/service_account_key.json"
+            config.service_account_key_path
         )
     )
-    speach_config = cloud_speech.RecognitionConfig(
+    speech_config = cloud_speech.RecognitionConfig(
         auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
         # encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         # sample_rate_hertz=16000,
@@ -233,12 +237,36 @@ async def main2() -> None:
     # audio = speech.RecognitionAudio(content=Base64.decode(message.contentAudio))
     request = cloud_speech.RecognizeRequest(
         recognizer="projects/swift-handler-446606-q0/locations/global/recognizers/_",
-        config=speach_config,
+        config=speech_config,
         content=Base64.decode(message.contentAudio),
     )
-    ret = speach_client.recognize(request=request)
+    ret = speech_client.recognize(request=request)
     print(ret)
     await db.disconnect()
+
+
+def pcm_to_wav_bytes(pcm_bytes, sample_rate=16000, channels=1, sample_width=2):
+    """
+    PCMバイトデータをWAVバイトデータに変換します。
+
+    :param pcm_bytes: PCM形式の音声データ
+    :param sample_rate: サンプルレート
+    :param channels: チャンネル数(モノラル=1、ステレオ=2)
+    :param sample_width: サンプル幅(バイト単位、ex. 16ビット=2)
+    :return: WAV形式の音声データ
+    """
+    with io.BytesIO() as wav_io:
+        # WAVファイルの書き込み用にwaveモジュールを使用
+        with wave.open(wav_io, "wb") as wav_file:
+            wav_file.setnchannels(channels)
+            wav_file.setsampwidth(sample_width)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(pcm_bytes)
+
+        # バイトデータとして取得
+        wav_bytes = wav_io.getvalue()
+
+    return wav_bytes
 
 
 if __name__ == "__main__":

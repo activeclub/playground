@@ -2,20 +2,21 @@ import asyncio
 import base64
 import io
 import traceback
+import uuid
 
 import cv2
-import numpy as np
 import PIL.Image
 import pyaudio
 from google import genai
 from google.cloud import speech
 from google.oauth2 import service_account
 from prisma import Prisma
-from prisma.fields import Base64
 from prisma.models import Message
 
 from zenn_ai_agent.config import config as app_config
-from zenn_ai_agent.speach import speak_from_bytes
+from zenn_ai_agent.speech import speak_from_bytes
+from zenn_ai_agent.speech_to_text import pcm_to_wav_bytes
+from zenn_ai_agent.storage import bucket
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1  # monaural
@@ -59,9 +60,9 @@ class AudioLoop:
         self.audio_interface = pyaudio.PyAudio()
         self.audio_stream = None
 
-        self.speach = speech.SpeechClient(
+        self.speech = speech.SpeechAsyncClient(
             credentials=service_account.Credentials.from_service_account_file(
-                "/Users/nszknao/Downloads/service_account_key.json"
+                app_config.service_account_key_path
             )
         )
 
@@ -116,23 +117,49 @@ class AudioLoop:
 
     async def save_db(self):
         language_code = "ja-JP"  # a BCP-47 language tag
-        speach_config = speech.RecognitionConfig(
+        speech_config_system = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=RECEIVE_SAMPLE_RATE,
+            language_code=language_code,
+        )
+        speech_config_user = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=SEND_SAMPLE_RATE,
             language_code=language_code,
         )
         while True:
             data = await self.db_queue.get()
-            audio = speech.RecognitionAudio(content=data["audio"])
-            response = self.speach.recognize(config=speach_config, audio=audio)
+            speaker = data["speaker"]
+
+            audio_id = str(uuid.uuid4())
+            blob = bucket.blob(f"{audio_id}.wav")
+
+            if speaker == "SYSTEM":
+                wav_bytes = pcm_to_wav_bytes(
+                    data["audio"], sample_rate=RECEIVE_SAMPLE_RATE
+                )
+                speech_config = speech_config_system
+            elif speaker == "USER":
+                wav_bytes = pcm_to_wav_bytes(data["audio"], sample_rate=SEND_SAMPLE_RATE)
+                speech_config = speech_config_user
+            else:
+                raise ValueError(f"Invalid speaker: {speaker}")
+
+            blob.upload_from_string(wav_bytes, content_type="audio/wav")
+            audio = speech.RecognitionAudio(
+                # content=data["audio"],
+                uri=f"gs://{app_config.cloud_storage_bucket}/{blob.name}",
+            )
+            response = await self.speech.recognize(config=speech_config, audio=audio)
             transcript = ""
             for result in response.results:
                 transcript += result.alternatives[0].transcript
             await Message.prisma().create(
                 {
-                    "contentAudio": Base64.encode(data["audio"]),
+                    "id": audio_id,
+                    "contentURL": blob.public_url,
                     "contentTranscript": transcript,
-                    "speaker": data["speaker"],
+                    "speaker": speaker,
                 }
             )
 
@@ -156,14 +183,15 @@ class AudioLoop:
         while True:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
 
-            # await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+            self.db_queue.put_nowait({"audio": data, "speaker": "USER"})
+            await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
             # FIXME: For some reason, the response stops coming back.
-            audio_data = np.frombuffer(data, dtype=np.int16)
-            mean_abs_amplitude = np.abs(audio_data).mean()
-            if mean_abs_amplitude > 500:
-                await self.db_queue.put({"audio": data, "speaker": "USER"})
-                await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+            # audio_data = np.frombuffer(data, dtype=np.int16)
+            # mean_abs_amplitude = np.abs(audio_data).mean()
+            # if mean_abs_amplitude > 500:
+            #     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
+            #     self.db_queue.put_nowait({"audio": data, "speaker": "USER"})
 
     def _get_frame(self, frame_rgb):
         img = PIL.Image.fromarray(frame_rgb)  # Now using RGB frame
@@ -223,7 +251,7 @@ class AudioLoop:
             async for response in turn:
                 if data := response.data:
                     self.audio_in_queue.put_nowait(data)
-                    self.db_queue.put_nowait({"data": data, "speaker": "SYSTEM"})
+                    self.db_queue.put_nowait({"audio": data, "speaker": "SYSTEM"})
                     continue
                 if text := response.text:
                     print(text, end="")
