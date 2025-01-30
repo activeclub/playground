@@ -6,8 +6,6 @@ import wave
 
 import pyaudio
 from google.cloud import speech
-from google.cloud.speech_v2 import SpeechClient
-from google.cloud.speech_v2.types import cloud_speech
 
 from zenn_ai_agent.config import config
 
@@ -216,31 +214,44 @@ def main() -> None:
 
 async def main2() -> None:
     from google.oauth2 import service_account
-    from prisma import Base64, Prisma
+    from prisma import Prisma
 
-    speech_client = SpeechClient(
+    speech_client = speech.SpeechAsyncClient(
         credentials=service_account.Credentials.from_service_account_file(
             config.service_account_key_path
         )
     )
-    speech_config = cloud_speech.RecognitionConfig(
-        auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
-        # encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-        # sample_rate_hertz=16000,
-        language_codes=["ja-JP"],
-        model="latest_long",
+    speech_config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        sample_rate_hertz=16000,
+        language_code="ja-JP",
     )
+    # speech_config = cloud_speech.RecognitionConfig(
+    #     auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
+    #     # encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+    #     # sample_rate_hertz=16000,
+    #     language_codes=["ja-JP"],
+    #     model="latest_long",
+    # )
 
     db = Prisma()
     await db.connect()
     message = await db.message.find_first(where={"id": "cm66ch1ej0002q5nx6h9u8nez"})
     # audio = speech.RecognitionAudio(content=Base64.decode(message.contentAudio))
-    request = cloud_speech.RecognizeRequest(
-        recognizer="projects/swift-handler-446606-q0/locations/global/recognizers/_",
-        config=speech_config,
-        content=Base64.decode(message.contentAudio),
+
+    audio = speech.RecognitionAudio(
+        # content=data["audio"],
+        uri=f"gs://{config.cloud_storage_bucket}/b667092d-83b9-4371-a9fb-00436a0a2b7e.wav",
     )
-    ret = speech_client.recognize(request=request)
+
+    ret = await speech_client.recognize(config=speech_config, audio=audio)
+    # request = cloud_speech.RecognizeRequest(
+    #     recognizer="projects/swift-handler-446606-q0/locations/global/recognizers/_",
+    #     config=speech_config,
+    #     content=Base64.decode(message.contentAudio),
+    # )
+    # ret = speech_client.recognize(request=request)
+
     print(ret)
     await db.disconnect()
 

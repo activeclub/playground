@@ -5,6 +5,7 @@ import traceback
 import uuid
 
 import cv2
+import numpy as np
 import PIL.Image
 import pyaudio
 from google import genai
@@ -136,11 +137,19 @@ class AudioLoop:
 
             if speaker == "SYSTEM":
                 wav_bytes = pcm_to_wav_bytes(
-                    data["audio"], sample_rate=RECEIVE_SAMPLE_RATE
+                    data["audio"],
+                    channels=CHANNELS,
+                    sample_rate=RECEIVE_SAMPLE_RATE,
+                    sample_width=2, # 16bit
                 )
                 speech_config = speech_config_system
             elif speaker == "USER":
-                wav_bytes = pcm_to_wav_bytes(data["audio"], sample_rate=SEND_SAMPLE_RATE)
+                wav_bytes = pcm_to_wav_bytes(
+                    data["audio"],
+                    channels=CHANNELS,
+                    sample_rate=SEND_SAMPLE_RATE,
+                    sample_width=2, # 16bit
+                )
                 speech_config = speech_config_user
             else:
                 raise ValueError(f"Invalid speaker: {speaker}")
@@ -180,18 +189,28 @@ class AudioLoop:
         else:
             kwargs = {}
 
+        turn_block = b""
+        silent_chnks = 0
         while True:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
 
-            self.db_queue.put_nowait({"audio": data, "speaker": "USER"})
             await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
-            # FIXME: For some reason, the response stops coming back.
-            # audio_data = np.frombuffer(data, dtype=np.int16)
-            # mean_abs_amplitude = np.abs(audio_data).mean()
-            # if mean_abs_amplitude > 500:
-            #     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
-            #     self.db_queue.put_nowait({"audio": data, "speaker": "USER"})
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            mean_abs_amplitude = np.abs(audio_data).mean()
+
+            if mean_abs_amplitude > 500:
+                turn_block += data
+                silent_chnks = 0
+            else:
+                silent_chnks += 1
+                # 3秒以上の無音区間があれば、ターンの終了判定
+                if silent_chnks * CHUNK_SIZE * CHANNELS >= SEND_SAMPLE_RATE * 3:
+                    if turn_block:
+                        self.db_queue.put_nowait(
+                            {"audio": turn_block, "speaker": "USER"}
+                        )
+                        turn_block = b""
 
     def _get_frame(self, frame_rgb):
         img = PIL.Image.fromarray(frame_rgb)  # Now using RGB frame
@@ -248,10 +267,16 @@ class AudioLoop:
         "Background task to reads from the websocket and write pcm chunks to the output queue"
         while True:
             turn = self.session.receive()
+            turn_block = b""
             async for response in turn:
                 if data := response.data:
                     self.audio_in_queue.put_nowait(data)
-                    self.db_queue.put_nowait({"audio": data, "speaker": "SYSTEM"})
+                    if not data:
+                        self.db_queue.put_nowait(
+                            {"audio": turn_block, "speaker": "SYSTEM"}
+                        )
+                    else:
+                        turn_block += data
                     continue
                 if text := response.text:
                     print(text, end="")
