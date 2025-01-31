@@ -1,12 +1,11 @@
 import { GetMessages } from "@/app/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { API_BASE_URL } from "@/config";
 import { dayjs } from "@/lib/dayjs";
 
 export default async function LoginPage() {
   const ret = await fetch(`${API_BASE_URL}/api/messages`, { method: "GET" });
   const { data: messages } = (await ret.json()) as GetMessages;
-  console.log(messages);
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-start gap-6 bg-muted p-6 md:p-10">
