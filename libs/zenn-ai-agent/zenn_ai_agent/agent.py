@@ -271,7 +271,8 @@ class AudioLoop:
             async for response in turn:
                 if data := response.data:
                     self.audio_in_queue.put_nowait(data)
-                    if not data:
+                    has_nonzero = any(b != 0 for b in data)
+                    if not has_nonzero:
                         self.db_queue.put_nowait(
                             {"audio": turn_block, "speaker": "SYSTEM"}
                         )
