@@ -3,7 +3,7 @@ name = "simulation"
 version = "0.1.0"
 description = ""
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "==3.14.7"
 dependencies = [
   "gymnasium[mujoco,classic-control,other]==0.29.1",
   "mujoco==3.2.7",
